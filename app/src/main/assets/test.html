@@ -1,0 +1,184 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+</head>
+<body>
+<canvas id="map" width="300" height="300" style="border:1px solid #000;"></canvas>
+<canvas id="userView" width="300" height="300" style="border:1px solid #000;"></canvas>
+<script>
+    function getNextPointByAngle(x,y,angle,step){
+        var r = angle * (Math.PI/180);
+        x += Math.cos(r)*step;
+        y += Math.sin(r)*step;
+        return {x:x,y:y};
+    }
+
+    function getDistance(x1,x2,y1,y2){
+        return Math.sqrt( (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) );
+    }
+
+    function getAngleByLine(x1,y1,x2,y2){
+        var rads = Math.atan2(y2 - y1,x2 - x1);
+
+        if (rads < 0){
+            rads += (2*Math.PI);
+        }
+        return parseInt(rads/(Math.PI/180));
+    }
+
+    function getMinimumDifferenceBetweenAngles(angleOne,angleTwo){
+        var angle = Math.abs(angleOne - angleTwo);
+        return angle>180?360-angle:angle;
+    }
+
+    function normalizeAngle(angle){
+        if(angle > 360){
+            angle -= (parseInt(angle/360))*360;
+        }
+        if(angle < 0){
+            angle += (parseInt(angle/360))*360;
+        }
+        return angle;
+    }
+
+    var PLAYER_1 = "001";
+    var PLAYER_2 = "002";
+    var PLAYER_3 = "003";
+    var PLAYER_4 = "004";
+
+    function getViewAngleForPlayer(player){
+        switch(player){
+            case PLAYER_1 : return 270;
+            case PLAYER_2 : return 90;
+            case PLAYER_3 : return 180;
+            case PLAYER_4 : return 0;
+        }
+        return null;
+    }
+
+    function doesPlayerSeeIt(player,angle){
+        return getMinimumDifferenceBetweenAngles(getViewAngleForPlayer(player),angle)>45?false:true;
+    }
+
+    var user = {x:100,y:100,angle:0,player:PLAYER_4};
+    var enemy = {x:200,y:100,angle:0};
+
+    window.onload=function(){
+        var map = document.getElementById('map');
+        var contextMap = map.getContext('2d');
+
+        var userView = document.getElementById('userView');
+        var contextUserView = userView.getContext('2d');
+
+        var middleViewX = userView.width/2;
+        var middleViewY = userView.height/2;
+
+        function draw(){
+            clearContext(contextMap,map);
+            writeUnit(user.x,user.y,user.angle,contextMap);
+            writeUnit(enemy.x,enemy.y,enemy.angle,contextMap);
+
+            for(var angle=0;angle<=360;angle+=45){
+                var text = getNextPointByAngle(middleViewX,middleViewY,angle,100);
+                contextMap.fillText(angle+"c",text.x,text.y);
+            }
+
+            for(var angle=0;angle<=360;angle+=45){
+                var text = getNextPointByAngle(middleViewX,middleViewY,angle,100);
+                contextMap.fillText(angle+"c",text.x,text.y);
+            }
+
+            // here is userView
+            clearContext(contextUserView,userView);
+            writeLine(0,0,userView.width,userView.height,contextUserView);
+            writeLine(userView.width,0,0,userView.height,contextUserView);
+
+            user.player = PLAYER_1;
+            proceedPlayerX(user);
+            /*
+            user.player = PLAYER_2;
+            proceedPlayerX(user);
+            user.player = PLAYER_3;
+            proceedPlayerX(user);
+            user.player = PLAYER_4;
+            proceedPlayerX(user);
+            //*/
+
+
+        };
+
+        function proceedPlayerX(playerX){
+            var userViewAngle = getViewAngleForPlayer(playerX.player);
+
+            var distanceBetweenUserAndEnemy = getDistance(playerX.x,enemy.x,playerX.y,enemy.y);
+            var angleBetweenUserAndEnemy = getAngleByLine(playerX.x,playerX.y,enemy.x,enemy.y);
+
+            var correctedAngle = normalizeAngle(360 - playerX.angle);
+            angleBetweenUserAndEnemy += correctedAngle + userViewAngle;
+            angleBetweenUserAndEnemy = normalizeAngle(angleBetweenUserAndEnemy);
+
+            writeUnit(middleViewX,middleViewY,userViewAngle,contextUserView);
+            if(doesPlayerSeeIt(playerX.player,angleBetweenUserAndEnemy)){
+                var enemyViewPoint = getNextPointByAngle(middleViewX,middleViewY,angleBetweenUserAndEnemy,distanceBetweenUserAndEnemy);
+                writeUnit(enemyViewPoint.x,enemyViewPoint.y,enemy.angle,contextUserView);
+            }
+        }
+
+        setInterval(function(){draw();},100);
+      };
+
+    function clearContext(context,canvas){
+        context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function writeUnit(x,y,angle,context){
+        context.beginPath();
+        context.moveTo(x,y);
+        var lookingAt = getNextPointByAngle(x,y,angle,10);
+        context.lineTo(lookingAt.x,lookingAt.y);
+        context.stroke();
+    }
+
+    function writeLine(x1,y1,x2,y2,context){
+        context.beginPath();
+        context.moveTo(x1,y1);
+        context.lineTo(x2,y2);
+        context.stroke();
+    }
+
+
+    function clickLeft(){
+        user.angle-=3;
+    };
+
+    function clickRight(){
+        user.angle+=3;
+    };
+
+    function clickUp(){
+        var nextPoint = getNextPointByAngle(user.x,user.y,user.angle,4);
+        user.x = nextPoint.x;
+        user.y = nextPoint.y;
+    };
+
+    function clickDown(){
+        var nextPoint = getNextPointByAngle(user.x,user.y,user.angle+180,4);
+        user.x = nextPoint.x;
+        user.y = nextPoint.y;
+
+    };
+
+    window.onkeydown = function(e) {
+        e = e || event; // "real browsers" || IE6/7.
+        switch (e.keyCode) {
+            case 37: clickLeft(); break;
+            case 38: clickUp(); break;
+            case 39: clickRight(); break;
+            case 40: clickDown(); break;
+        }
+
+        user.angle = normalizeAngle(user.angle);
+    }
+    </script>
+</body>
+</html>
